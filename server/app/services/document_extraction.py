@@ -2,6 +2,7 @@ import io
 from typing import List, Tuple
 
 import pymupdf as fitz
+from docx import Document
 from pptx import Presentation
 from pypdf import PdfReader
 
@@ -41,4 +42,17 @@ def extract_pptx(data: bytes) -> str:
                 text = "\n".join(p.text for p in shape.text_frame.paragraphs)
                 if text.strip():
                     chunks.append(text)
+    return "\n\n".join(chunks)
+
+
+def extract_docx(data: bytes) -> str:
+    doc = Document(io.BytesIO(data))
+    chunks = [p.text for p in doc.paragraphs if p.text.strip()]
+    # Study notes often keep definitions/comparisons in tables, which
+    # doc.paragraphs doesn't include.
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                chunks.append(" | ".join(cells))
     return "\n\n".join(chunks)

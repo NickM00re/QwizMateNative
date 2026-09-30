@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
-import { PickedFile } from "../types";
+import * as Sharing from "expo-sharing";
+import { Note, PickedFile } from "../types";
 
 const NOTES_DIR = `${FileSystem.documentDirectory}notes/`;
 
@@ -35,4 +36,35 @@ export async function deletePersistedFile(uri: string): Promise<void> {
   } catch {
     // best-effort cleanup
   }
+}
+
+// Opens a file note for viewing. On web, PDFs and images open in a new tab
+// and other files (Word, PowerPoint) download under their note name. On
+// native there's no in-app viewer for Office files, so this opens the share
+// sheet, which offers a Quick Look preview and "Open in" Word/Pages/Files.
+export async function openNoteFile(note: Note): Promise<void> {
+  if (Platform.OS === "web") {
+    let blob: Blob;
+    try {
+      blob = await fetch(note.uri).then((r) => r.blob());
+    } catch {
+      // Picker blob: URLs don't survive a page reload (see persistPickedFile).
+      throw new Error("This file is no longer available. Remove it and add it again.");
+    }
+    const url = URL.createObjectURL(blob);
+    if (note.kind === "pdf" || note.kind === "image") {
+      window.open(url, "_blank");
+    } else {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = note.name;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("Opening files isn't supported on this device.");
+  }
+  await Sharing.shareAsync(note.uri, { mimeType: note.mimeType, dialogTitle: note.name });
 }

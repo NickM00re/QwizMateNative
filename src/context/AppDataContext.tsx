@@ -12,11 +12,17 @@ function makeId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function noteKindFor(mimeType: string): NoteKind {
+// Pickers don't always report a useful MIME type for Office files (web and
+// some Android devices send application/octet-stream), so the file extension
+// is checked too. "text" is reserved for pasted notes, which carry their
+// content in textContent; any other picked file is uploaded as-is.
+function noteKindFor(mimeType: string, name: string): NoteKind {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
   if (mimeType.startsWith("image/")) return "image";
-  if (mimeType === "application/pdf") return "pdf";
-  if (mimeType.includes("presentation")) return "pptx";
-  return "text";
+  if (mimeType === "application/pdf" || ext === "pdf") return "pdf";
+  if (mimeType.includes("presentation") || ext === "pptx") return "pptx";
+  if (mimeType.includes("wordprocessingml") || ext === "docx") return "docx";
+  return "file";
 }
 
 export interface ProjectStats {
@@ -46,12 +52,14 @@ interface AppDataContextValue {
   addTextNote: (projectId: string, name: string, text: string) => Promise<Note>;
   addFileNote: (projectId: string, file: PickedFile) => Promise<Note>;
   updateNote: (id: string, patch: { name?: string; textContent?: string }) => Promise<void>;
+  replaceNoteFile: (id: string, file: PickedFile) => Promise<void>;
   removeNote: (id: string) => Promise<void>;
   recordAttempt: (
     projectId: string,
     questions: QuizQuestion[],
     answers: (number | null)[]
   ) => Promise<QuizAttempt>;
+  deleteAttempt: (id: string) => Promise<void>;
   notesForProject: (projectId: string) => Note[];
   attemptsForProject: (projectId: string) => QuizAttempt[];
   projectStats: (projectId: string) => ProjectStats;
@@ -149,7 +157,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const note: Note = {
       id,
       projectId,
-      kind: noteKindFor(file.mimeType),
+      kind: noteKindFor(file.mimeType, file.name),
       name: file.name,
       mimeType: file.mimeType,
       uri: persistedUri,
@@ -161,6 +169,24 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   async function updateNote(id: string, patch: { name?: string; textContent?: string }): Promise<void> {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
+  }
+
+  // Swaps the file behind an existing note (e.g. after editing it in another
+  // app) while keeping its id and name, so the note stays where it was.
+  async function replaceNoteFile(id: string, file: PickedFile): Promise<void> {
+    const old = notes.find((n) => n.id === id);
+    if (!old) return;
+    // Persist under a fresh filename: on native, copying onto the old path
+    // fails when the extension is unchanged.
+    const persistedUri = await persistPickedFile(`${id}_${Date.now()}`, file);
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === id
+          ? { ...n, kind: noteKindFor(file.mimeType, file.name), mimeType: file.mimeType, uri: persistedUri }
+          : n
+      )
+    );
+    await deletePersistedFile(old.uri);
   }
 
   async function removeNote(id: string): Promise<void> {
@@ -186,6 +212,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     };
     setAttempts((prev) => [...prev, attempt]);
     return attempt;
+  }
+
+  async function deleteAttempt(id: string): Promise<void> {
+    setAttempts((prev) => prev.filter((a) => a.id !== id));
   }
 
   function notesForProject(projectId: string): Note[] {
@@ -246,8 +276,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     addTextNote,
     addFileNote,
     updateNote,
+    replaceNoteFile,
     removeNote,
     recordAttempt,
+    deleteAttempt,
     notesForProject,
     attemptsForProject,
     projectStats,

@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -20,6 +21,30 @@ IMAGE_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic
 TEXT_TYPES = {"text/plain", "text/markdown"}
 PDF_TYPE = "application/pdf"
 PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+# Some browsers/OS pickers send Office files as application/octet-stream (or
+# with no type at all), so fall back to the file extension to identify them.
+EXTENSION_TYPES = {
+    ".pdf": PDF_TYPE,
+    ".pptx": PPTX_TYPE,
+    ".docx": DOCX_TYPE,
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+}
+
+
+def resolve_content_type(upload: UploadFile) -> str:
+    content_type = upload.content_type or ""
+    if content_type in IMAGE_TYPES | TEXT_TYPES | {PDF_TYPE, PPTX_TYPE, DOCX_TYPE}:
+        return content_type
+    ext = os.path.splitext(upload.filename or "")[1].lower()
+    return EXTENSION_TYPES.get(ext, content_type)
 
 
 @app.get("/health")
@@ -46,7 +71,7 @@ async def create_quiz(
         if size_mb > config.MAX_UPLOAD_MB:
             raise HTTPException(400, f"{upload.filename} is over the {config.MAX_UPLOAD_MB}MB limit.")
 
-        content_type = upload.content_type or ""
+        content_type = resolve_content_type(upload)
         if content_type in IMAGE_TYPES:
             page_images.append(data)
         elif content_type == PDF_TYPE:
@@ -56,6 +81,8 @@ async def create_quiz(
             page_images.extend(images)
         elif content_type == PPTX_TYPE:
             text_parts.append(document_extraction.extract_pptx(data))
+        elif content_type == DOCX_TYPE:
+            text_parts.append(document_extraction.extract_docx(data))
         elif content_type in TEXT_TYPES:
             text_parts.append(data.decode("utf-8", errors="ignore"))
         else:

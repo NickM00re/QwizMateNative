@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--web"],
       "port": 8081
+    },
+    {
+      "name": "qwizmate-server",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd server && .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"],
+      "port": 8000
     }
   ]
 }

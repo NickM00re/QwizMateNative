@@ -26,13 +26,16 @@ import {
   Pencil,
   Trash2,
   Check,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react-native";
 import { colors, radius } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import ScoreBadge from "../components/ScoreBadge";
 import { generateQuiz } from "../lib/api";
 import { notesToUpload } from "../lib/notesToUpload";
-import { Note, QuizQuestion } from "../types";
+import { Note, PickedFile, QuizQuestion } from "../types";
+import { openNoteFile } from "../lib/notesFileStore";
 import { useAppData } from "../context/AppDataContext";
 import { pluralize } from "../lib/pluralize";
 import CreateProjectScreen from "./CreateProjectScreen";
@@ -50,8 +53,20 @@ export default function ProjectsScreen({
   onStartQuiz: (questions: QuizQuestion[], projectId: string) => void;
   onProjectCreated: (wasFirst: boolean) => void;
 }) {
-  const { projects, notesForProject, projectStats, createProject, addTextNote, addFileNote, updateNote, removeNote } =
-    useAppData();
+  const {
+    projects,
+    notesForProject,
+    attemptsForProject,
+    projectStats,
+    createProject,
+    deleteProject,
+    addTextNote,
+    addFileNote,
+    updateNote,
+    replaceNoteFile,
+    removeNote,
+    deleteAttempt,
+  } = useAppData();
 
   const [creating, setCreating] = useState(projects.length === 0);
   const [addingText, setAddingText] = useState("");
@@ -61,7 +76,10 @@ export default function ProjectsScreen({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editDraftName, setEditDraftName] = useState("");
   const [editDraftText, setEditDraftText] = useState("");
+  const [editDraftFile, setEditDraftFile] = useState<PickedFile | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteAttemptId, setConfirmDeleteAttemptId] = useState<string | null>(null);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
 
   const project = selectedId ? projects.find((p) => p.id === selectedId) ?? null : null;
 
@@ -71,6 +89,8 @@ export default function ProjectsScreen({
     setExpandedNoteId(null);
     setEditingNoteId(null);
     setConfirmDeleteId(null);
+    setConfirmDeleteAttemptId(null);
+    setConfirmDeleteProject(false);
   }, [selectedId]);
 
   useEffect(() => {
@@ -98,11 +118,7 @@ export default function ProjectsScreen({
   async function handlePickDocument() {
     if (!project) return;
     const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "text/plain",
-      ],
+      type: DOCUMENT_TYPES,
       multiple: true,
       copyToCacheDirectory: true,
     });
@@ -153,15 +169,63 @@ export default function ProjectsScreen({
     setEditingNoteId(note.id);
     setEditDraftName(note.name);
     setEditDraftText(note.textContent ?? "");
+    setEditDraftFile(null);
+  }
+
+  async function pickReplacementFile(note: Note) {
+    let file: PickedFile;
+    if (note.kind === "image") {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      file = {
+        uri: asset.uri,
+        name: asset.fileName ?? `note-photo-${Date.now()}.jpg`,
+        mimeType: asset.mimeType ?? "image/jpeg",
+      };
+    } else {
+      const result = await DocumentPicker.getDocumentAsync({ type: DOCUMENT_TYPES, copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      file = {
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType ?? "application/octet-stream",
+      };
+    }
+    setEditDraftFile(file);
+    // Follow the new file's name unless the user already typed a custom one.
+    if (editDraftName === note.name) setEditDraftName(file.name);
   }
 
   async function saveEdit() {
     if (!editingNoteId) return;
+    if (editDraftFile) await replaceNoteFile(editingNoteId, editDraftFile);
     await updateNote(editingNoteId, {
       name: editDraftName.trim() || "Untitled",
       textContent: editDraftText,
     });
     setEditingNoteId(null);
+    setEditDraftFile(null);
+  }
+
+  async function handleOpenFile(note: Note) {
+    setGenError(null);
+    try {
+      await openNoteFile(note);
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : "Couldn't open that file.");
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (!project) return;
+    await deleteProject(project.id);
+    setConfirmDeleteProject(false);
+    onBack();
   }
 
   async function handleDelete(id: string) {
@@ -192,6 +256,7 @@ export default function ProjectsScreen({
   if (project) {
     const stats = projectStats(project.id);
     const notes = notesForProject(project.id);
+    const attempts = [...attemptsForProject(project.id)].reverse();
 
     return (
       <ScrollView style={styles.flex1} contentContainerStyle={{ paddingBottom: 16 }}>
@@ -201,10 +266,36 @@ export default function ProjectsScreen({
           end={{ x: 1, y: 1 }}
           style={styles.detailHeader}
         >
-          <Pressable style={styles.backRow} onPress={onBack}>
-            <ArrowLeft size={15} color="rgba(255,255,255,0.75)" />
-            <Text style={styles.backText}>All Projects</Text>
-          </Pressable>
+          <View style={styles.headerTopRow}>
+            <Pressable style={styles.backRow} onPress={onBack}>
+              <ArrowLeft size={15} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.backText}>All Projects</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setConfirmDeleteProject(true)}
+              hitSlop={8}
+              style={styles.headerIconBtn}
+              accessibilityLabel="Delete course"
+            >
+              <Trash2 size={15} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+          </View>
+          {confirmDeleteProject && (
+            <View style={styles.headerConfirm}>
+              <Text style={styles.headerConfirmText}>
+                Delete this course? Its {pluralize(stats.noteCount, "note")} and{" "}
+                {pluralize(stats.quizCount, "quiz", "quizzes")} will be removed too.
+              </Text>
+              <View style={styles.headerConfirmActions}>
+                <Pressable onPress={() => setConfirmDeleteProject(false)}>
+                  <Text style={styles.confirmCancel}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={handleDeleteProject}>
+                  <Text style={styles.confirmDelete}>Delete Course</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
           <Text style={styles.detailName}>{project.name}</Text>
           <Text style={styles.detailCourse}>{project.course}</Text>
           <View style={styles.detailStatsRow}>
@@ -259,7 +350,7 @@ export default function ProjectsScreen({
           <View style={styles.addNotesCard}>
             <Text style={styles.sectionTitle}>Study Notes</Text>
             <Text style={styles.addNotesSubtitle}>
-              Handwritten photos, PDFs, slides, or pasted text — the quiz above is generated
+              Handwritten photos, PDFs, Word docs, slides, or pasted text — the quiz above is generated
               from everything in this list.
             </Text>
 
@@ -324,8 +415,27 @@ export default function ProjectsScreen({
                             placeholderTextColor={colors.mutedForeground}
                           />
                         )}
+                        {note.kind !== "text" && (
+                          <View style={styles.replaceRow}>
+                            <Pressable style={styles.replaceBtn} onPress={() => pickReplacementFile(note)}>
+                              <RefreshCw size={13} color={colors.primary} />
+                              <Text style={styles.replaceBtnText}>Replace File…</Text>
+                            </Pressable>
+                            <Text style={styles.replaceHint} numberOfLines={1}>
+                              {editDraftFile
+                                ? `New file: ${editDraftFile.name}`
+                                : "Edited this file elsewhere? Swap in the new version."}
+                            </Text>
+                          </View>
+                        )}
                         <View style={styles.editActionsRow}>
-                          <Pressable style={styles.editCancelBtn} onPress={() => setEditingNoteId(null)}>
+                          <Pressable
+                            style={styles.editCancelBtn}
+                            onPress={() => {
+                              setEditingNoteId(null);
+                              setEditDraftFile(null);
+                            }}
+                          >
                             <Text style={styles.editCancelBtnText}>Cancel</Text>
                           </Pressable>
                           <Pressable style={styles.editSaveBtn} onPress={saveEdit}>
@@ -386,10 +496,16 @@ export default function ProjectsScreen({
                           {note.kind === "image" && (
                             <Image source={{ uri: note.uri }} style={styles.notePreviewImage} resizeMode="cover" />
                           )}
-                          {(note.kind === "pdf" || note.kind === "pptx") && (
+                          {note.kind !== "text" && note.kind !== "image" && (
                             <Text style={styles.noteExpandedMeta}>
-                              {note.kind.toUpperCase()} file — included when you generate a quiz.
+                              {note.kind === "file" ? "File" : `${note.kind.toUpperCase()} file`} — included when you generate a quiz.
                             </Text>
+                          )}
+                          {note.kind !== "text" && (
+                            <Pressable style={styles.openFileBtn} onPress={() => handleOpenFile(note)}>
+                              <ExternalLink size={13} color={colors.primary} />
+                              <Text style={styles.replaceBtnText}>Open File</Text>
+                            </Pressable>
                           )}
                         </View>
                       )}
@@ -399,6 +515,58 @@ export default function ProjectsScreen({
               </View>
             )}
           </View>
+
+          {attempts.length > 0 && (
+            <View style={styles.addNotesCard}>
+              <Text style={styles.sectionTitle}>Quiz History</Text>
+              <View style={{ gap: 8, marginTop: 12 }}>
+                {attempts.map((attempt, i) => {
+                  const isConfirming = confirmDeleteAttemptId === attempt.id;
+                  return (
+                    <View key={attempt.id} style={styles.noteCard}>
+                      <View style={styles.noteRow}>
+                        <View style={[styles.noteIcon, { backgroundColor: project.bg }]}>
+                          <Brain size={15} color={project.color} />
+                        </View>
+                        <View style={styles.flexShrink}>
+                          <Text style={styles.noteTitle}>Quiz {attempts.length - i}</Text>
+                          <Text style={styles.noteMeta}>
+                            {new Date(attempt.createdAt).toLocaleDateString()} ·{" "}
+                            {pluralize(attempt.questions.length, "question")}
+                          </Text>
+                        </View>
+                        <ScoreBadge score={attempt.scorePct} />
+                        <Pressable
+                          onPress={() => setConfirmDeleteAttemptId(attempt.id)}
+                          hitSlop={8}
+                          style={styles.iconBtn}
+                          accessibilityLabel="Delete quiz"
+                        >
+                          <Trash2 size={14} color={colors.destructive} />
+                        </Pressable>
+                      </View>
+                      {isConfirming && (
+                        <View style={styles.confirmRow}>
+                          <Text style={styles.confirmText}>Delete this quiz and its score?</Text>
+                          <Pressable onPress={() => setConfirmDeleteAttemptId(null)}>
+                            <Text style={styles.confirmCancel}>Cancel</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={async () => {
+                              await deleteAttempt(attempt.id);
+                              setConfirmDeleteAttemptId(null);
+                            }}
+                          >
+                            <Text style={styles.confirmDelete}>Delete</Text>
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
@@ -463,6 +631,13 @@ export default function ProjectsScreen({
   );
 }
 
+const DOCUMENT_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+
 const styles = StyleSheet.create({
   flex1: { flex: 1 },
   flexShrink: { flex: 1, minWidth: 0 },
@@ -471,7 +646,18 @@ const styles = StyleSheet.create({
 
   // Detail view
   detailHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
-  backRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16 },
+  headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  headerIconBtn: { padding: 4 },
+  headerConfirm: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  headerConfirmText: { color: colors.foreground, fontSize: 13, fontFamily: fonts.body },
+  headerConfirmActions: { flexDirection: "row", justifyContent: "flex-end", gap: 16 },
   backText: { color: "rgba(255,255,255,0.75)", fontSize: 14, fontFamily: fonts.body },
   detailName: { color: colors.white, fontSize: 24, fontFamily: fonts.displayBold, marginBottom: 2 },
   detailCourse: { color: "rgba(255,255,255,0.65)", fontSize: 12, fontFamily: fonts.mono },
@@ -601,6 +787,29 @@ const styles = StyleSheet.create({
   noteExpandedText: { color: colors.foreground, fontSize: 13, fontFamily: fonts.body, lineHeight: 19 },
   noteExpandedMeta: { color: colors.mutedForeground, fontSize: 12, fontFamily: fonts.body },
   notePreviewImage: { width: "100%", height: 160, borderRadius: 8 },
+  openFileBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  replaceRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  replaceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  replaceBtnText: { color: colors.primary, fontSize: 13, fontFamily: fonts.bodySemibold },
+  replaceHint: { flex: 1, color: colors.mutedForeground, fontSize: 12, fontFamily: fonts.body },
   noteEditCard: {
     backgroundColor: colors.card,
     borderWidth: 1,

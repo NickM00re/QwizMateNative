@@ -9,10 +9,10 @@ export interface Project {
   createdAt: number;
 }
 
-export type NoteKind = "text" | "image" | "pdf" | "pptx";
+export type NoteKind = "text" | "image" | "pdf" | "pptx" | "docx" | "file";
 
 // A single uploaded/pasted note that belongs to a project. File-backed notes
-// (image/pdf/pptx) are copied into persistent app storage on native so they
+// (image/pdf/pptx/docx/file) are copied into persistent app storage on native so they
 // survive app restarts; on web, `uri` is a session-lived blob URL (see
 // src/lib/notesFileStore.ts for why).
 export interface Note {

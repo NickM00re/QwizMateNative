@@ -57,6 +57,12 @@ function AppInner() {
     }
   }, [authStatus, dataReady, initialRouteSet]);
 
+  // Drop an in-progress quiz whose course was deleted, so finishing it doesn't
+  // record a score against a course that no longer exists.
+  useEffect(() => {
+    if (activeQuiz && !projects.some((p) => p.id === activeQuiz.projectId)) setActiveQuiz(null);
+  }, [projects, activeQuiz]);
+
   const appReady = (fontsLoaded || !!fontError) && authStatus !== "checking" && dataReady;
 
   const onLayoutRootView = useCallback(async () => {
