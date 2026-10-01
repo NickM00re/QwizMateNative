@@ -9,8 +9,8 @@
     },
     {
       "name": "qwizmate-server",
-      "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd server && .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"],
+      "runtimeExecutable": "server/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--reload", "--app-dir", "server", "--host", "0.0.0.0", "--port", "8000"],
       "port": 8000
     }
   ]
