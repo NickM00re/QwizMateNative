@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Note, NoteKind, PickedFile, Project, QuizAttempt, QuizQuestion } from "../types";
 import { readJSON, writeJSON } from "../lib/storage";

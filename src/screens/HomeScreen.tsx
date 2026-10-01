@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import React from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";

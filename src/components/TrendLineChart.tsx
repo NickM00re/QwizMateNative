@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import React from "react";
 import { View, LayoutChangeEvent } from "react-native";
 import Svg, { Polyline, Circle, Line as SvgLine, Text as SvgText } from "react-native-svg";

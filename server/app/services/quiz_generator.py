@@ -1,3 +1,6 @@
+# QwizMate | SENG 564 | Fall 2026
+# Author: Nick Moore
+
 import base64
 import json
 from typing import List, Optional

@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import { Note } from "../types";
 import { UploadableFile } from "./api";
 

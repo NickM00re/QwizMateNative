@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 export type Tab = "home" | "projects" | "quiz" | "stats";
 
 export interface Project {

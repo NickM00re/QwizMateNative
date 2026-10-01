@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LOGGED_IN_KEY = "qwizmate.auth.loggedIn";

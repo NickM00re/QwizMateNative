@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import {
   BarlowCondensed_600SemiBold,
   BarlowCondensed_700Bold,

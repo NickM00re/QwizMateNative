@@ -1,5 +1,7 @@
 # QwizMate — React Native (Expo) app
 
+**Author:** Nick Moore · SENG 564 · Fall 2026
+
 This is a React Native conversion of the original QwizMate Figma/web export
 (`QwizMateApp`, a Vite + React + Tailwind single-page app). It reproduces the
 same 4 screens, colors, fonts, layout, copy and mock data — rebuilt with

@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import { Platform } from "react-native";
 import { API_BASE_URL } from "../config";
 import { QuizQuestion } from "../types";

@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 // Ported 1:1 from the Figma export's src/styles/theme.css (:root / light theme).
 export const colors: Record<string, string> = {
   background: "#f7f6ff",

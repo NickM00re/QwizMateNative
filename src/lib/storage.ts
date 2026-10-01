@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export async function readJSON<T>(key: string, fallback: T): Promise<T> {

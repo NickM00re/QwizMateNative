@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import React from "react";
 import { Text, View, StyleSheet } from "react-native";
 import { scoreColor } from "../theme/colors";

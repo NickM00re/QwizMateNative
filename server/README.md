@@ -1,5 +1,7 @@
 # QwizMate quiz-generation server
 
+**Author:** Nick Moore · SENG 564 · Fall 2026
+
 A small FastAPI service that sits between the React Native app and OpenAI.
 Its whole job is to hold your `OPENAI_API_KEY` server-side, so the key never
 ships inside the mobile app bundle. The app uploads notes (text, PDF, PPTX,

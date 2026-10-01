@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import React, { useEffect, useRef } from "react";
 import { View, Text, Pressable, Animated, StyleSheet } from "react-native";
 import { Home, Layers, Brain, BarChart2 } from "lucide-react-native";

@@ -1,3 +1,6 @@
+// QwizMate | SENG 564 | Fall 2026
+// Author: Nick Moore
+
 import { Platform } from "react-native";
 
 // Points at the local FastAPI server in server/. Edit this for your setup:

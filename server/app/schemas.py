@@ -1,3 +1,6 @@
+# QwizMate | SENG 564 | Fall 2026
+# Author: Nick Moore
+
 from typing import List, Literal
 
 from pydantic import BaseModel, Field

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "private": true,
+  "author": "Nick Moore",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
